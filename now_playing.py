@@ -15,7 +15,7 @@ from music_assistant_client import MusicAssistantClient
 from music_assistant_models.player import Player
 
 from now_playing_image import render_now_playing
-from now_playing_output import DisplayOutput, PreviewOutput
+from now_playing_output import DisplayOutput, OutputWorker, PreviewOutput
 
 
 def format_time(seconds):
@@ -104,7 +104,7 @@ async def main(output=None):
     
     previous_art = None
     
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession() as session, OutputWorker(output) as output_worker:
         async with MusicAssistantClient(server_url.rstrip("/"), session, token=token) as client, listen_for_events(client):
             while True:
                 
@@ -171,7 +171,10 @@ async def main(output=None):
                     "next_title": next_item.name if next_item else None,
                     "artwork": artwork,
                 })
-                await asyncio.to_thread(output.update, image)
+                track_identifier = (getattr(media, "uri", None) or
+                                    getattr(item, "queue_item_id", None))
+                song_key = (track_identifier, title, artist, album) if track_identifier or title else None
+                output_worker.submit(image, song_key)
                 
                 print("Player: {} | State: {} | Volume: {}".format(player.name, player.playback_state, player.volume_level), flush=True)
                 print("Song: {} | Artist: {} | Album: {}".format(title or "unknown", artist or "unknown", album or "unknown"), flush=True)
@@ -187,12 +190,11 @@ def parse_args(argv=None):
     mode.add_argument("--display", choices=["epd2in9_V2"], help="render on the selected display")
     parser.add_argument("--power-pin", type=int, help="verified display power-control BCM pin")
     parser.add_argument("--refresh-interval", type=float, default=0, help="minimum seconds between display refreshes (default: 0)")
-    parser.add_argument("--full-refresh-every", type=int, default=10, help="partial refreshes before a full refresh (default: 10)")
     args = parser.parse_args(argv)
     if args.display and args.power_pin is None:
         parser.error("--display requires a verified --power-pin")
-    if not 0 <= args.refresh_interval < float("inf") or args.full_refresh_every < 1:
-        parser.error("--refresh-interval must be non-negative and --full-refresh-every must be positive")
+    if not 0 <= args.refresh_interval < float("inf"):
+        parser.error("--refresh-interval must be non-negative")
     return args
 
 
@@ -201,8 +203,7 @@ def create_output(args):
         return PreviewOutput(args.preview or "now-playing-preview.png")
     from display_test import load_driver
 
-    return DisplayOutput(load_driver(args.display, args.power_pin),
-                         min_interval=args.refresh_interval, full_refresh_every=args.full_refresh_every)
+    return DisplayOutput(load_driver(args.display, args.power_pin), min_interval=args.refresh_interval)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
-"""Print Music Assistant player details once per second."""
+"""Monitor a Music Assistant player and render its now-playing screen."""
 
+import argparse
 import asyncio
 import os
 import sys
@@ -13,12 +14,35 @@ from dotenv import load_dotenv
 from music_assistant_client import MusicAssistantClient
 from music_assistant_models.player import Player
 
+from now_playing_image import render_now_playing
+from now_playing_output import DisplayOutput, PreviewOutput
+
 
 def format_time(seconds):
     if seconds is None:
         return "unknown"
     minutes, seconds = divmod(max(0, int(seconds)), 60)
     return "{}:{:02d}".format(minutes, seconds)
+
+
+def wifi_signal_dbm(interface="wlan0", path=Path("/proc/net/wireless")):
+    try:
+        lines = path.read_text().splitlines()[2:]
+    except OSError:
+        return None
+    for line in lines:
+        name, separator, values = line.partition(":")
+        if not separator or name.strip() != interface:
+            continue
+        fields = values.split()
+        try:
+            signal = float(fields[2].rstrip("."))
+        except (IndexError, ValueError):
+            return None
+        if 128 <= signal <= 255:
+            signal -= 256
+        return signal if -127 <= signal < 0 else None
+    return None
 
 
 @asynccontextmanager
@@ -57,7 +81,9 @@ async def download_cover(session, url, server_url, token, destination):
     destination.write_bytes(image)
 
 
-async def main():
+async def main(output=None):
+    if output is None:
+        output = PreviewOutput("now-playing-preview.png")
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     server_url = os.environ.get("MA_URL")
@@ -106,6 +132,14 @@ async def main():
                     duration = item.duration
                     elapsed = queue.corrected_elapsed_time
                     cover_url = client.get_image_url(item.image) if item.image else None
+                else:
+                    media = player.current_media
+                    title = media.title if media else None
+                    artist = media.artist if media else None
+                    album = media.album if media else None
+                    duration = media.duration if media else None
+                    elapsed = player.corrected_elapsed_time
+                    cover_url = media.image_url if media else None
                     
     
                 artwork = None
@@ -123,7 +157,22 @@ async def main():
                 else:
                     previous_art = None
                     
-                    
+                
+                image = render_now_playing({
+                    "player_name": player.name,
+                    "wifi_signal_dbm": wifi_signal_dbm(os.environ.get("WIFI_INTERFACE") or "wlan0"),
+                    "title": title,
+                    "artist": artist,
+                    "album": album,
+                    "state": player.playback_state,
+                    "volume": player.volume_level,
+                    "elapsed": elapsed,
+                    "duration": duration,
+                    "next_title": next_item.name if next_item else None,
+                    "artwork": artwork,
+                })
+                await asyncio.to_thread(output.update, image)
+                
                 print("Player: {} | State: {} | Volume: {}".format(player.name, player.playback_state, player.volume_level), flush=True)
                 print("Song: {} | Artist: {} | Album: {}".format(title or "unknown", artist or "unknown", album or "unknown"), flush=True)
                 print("Next: {}".format(next_item.name if next_item else "unavailable"), flush=True)
@@ -131,8 +180,35 @@ async def main():
                 await asyncio.sleep(1)
 
 
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--preview", metavar="PNG", default=None, help="save a preview PNG (default: now-playing-preview.png)")
+    mode.add_argument("--display", choices=["epd2in9_V2"], help="render on the selected display")
+    parser.add_argument("--power-pin", type=int, help="verified display power-control BCM pin")
+    parser.add_argument("--refresh-interval", type=float, default=30, help="minimum seconds between display refreshes (default: 30)")
+    parser.add_argument("--full-refresh-every", type=int, default=10, help="partial refreshes before a full refresh (default: 10)")
+    args = parser.parse_args(argv)
+    if args.display and args.power_pin is None:
+        parser.error("--display requires a verified --power-pin")
+    if not 0 <= args.refresh_interval < float("inf") or args.full_refresh_every < 1:
+        parser.error("--refresh-interval must be non-negative and --full-refresh-every must be positive")
+    return args
+
+
+def create_output(args):
+    if not args.display:
+        return PreviewOutput(args.preview or "now-playing-preview.png")
+    from display_test import load_driver
+
+    return DisplayOutput(load_driver(args.display, args.power_pin),
+                         min_interval=args.refresh_interval, full_refresh_every=args.full_refresh_every)
+
+
 if __name__ == "__main__":
+    args = parse_args()
     try:
-        asyncio.run(main())
+        with create_output(args) as output:
+            asyncio.run(main(output))
     except KeyboardInterrupt:
         pass

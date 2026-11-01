@@ -303,26 +303,17 @@ async def main(output, test_mode=False):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--test", action="store_true", help="save the UI to ui.png without using the display")
-    mode.add_argument("--display", choices=["epd2in9_V2"], default="epd2in9_V2", help="display model (default: epd2in9_V2)")
+    parser.add_argument("--test", action="store_true", help="save the UI to ui.png without using the display")
     return parser.parse_args(argv)
-
-
-def load_display_driver(model):
-    if model != "epd2in9_V2":
-        raise ValueError("Unsupported display model")
-    
-    from lib.waveshare_epd import epd2in9_V2
-
-    return epd2in9_V2
 
 
 # we using the real thing or just making pngs
 def create_output(args):
     if args.test:
         return PreviewOutput("ui.png")
-    return DisplayOutput(load_display_driver(args.display))
+    from lib.waveshare_epd import epd2in9_V2
+
+    return DisplayOutput(epd2in9_V2)
 
 
 if __name__ == "__main__":

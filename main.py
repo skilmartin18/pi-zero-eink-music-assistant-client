@@ -1,13 +1,12 @@
 """Monitor a Music Assistant player and render its now-playing screen."""
 
 import argparse
-import ast
 import asyncio
 import math
 import os
 import sys
 import time
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import AsyncExitStack
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 import socket 
@@ -26,64 +25,87 @@ from render_ui import DisplayOutput, OutputWorker, PreviewOutput
 CONNECTION_ERRORS = (TransportError, NotConnected, InvalidState, InvalidServerVersion,
                      aiohttp.ClientError, asyncio.TimeoutError, AuthenticationFailed,
                      AuthenticationRequired, InvalidToken)
-RESERVED_PINS = {0, 1, 8, 10, 11, 17, 18, 19, 21, 24, 25}
 
 
-class ServerConnectionError(Exception):
-    pass
-
-
+# Used to track the timeelapsed during a song due to a current bug where after playing/pausing 
+# the API was no longer updating the elapsed time
 class QueueElapsedTracker:
+    
     def __init__(self, clock=time.monotonic):
         self.clock = clock
         self.sample = None
 
     def elapsed(self, queue, item, player_state):
-        elapsed = queue.corrected_elapsed_time
-        duration = item.duration
-        if (isinstance(duration, (int, float)) and math.isfinite(duration) and duration > 0
-                and elapsed > duration + 2):
-            self.sample = None
-            return None
+        
+        corrected_elapsed_time = queue.corrected_elapsed_time
+        track_duration = item.duration
+        
 
-        item_id = getattr(item, "queue_item_id", None)
-        raw = getattr(queue, "elapsed_time", None)
-        updated = getattr(queue, "elapsed_time_last_updated", None)
-        speed = getattr(queue, "playback_speed", None)
-        if (not getattr(queue, "flow_mode", False) or not item_id
-                or getattr(player_state, "value", player_state) != "playing"
-                or getattr(queue.state, "value", queue.state) != "playing"
-                or not all(isinstance(value, (int, float)) and math.isfinite(value)
-                           for value in (raw, updated, speed)) or speed <= 0):
+        queue_item_id = getattr(item, "queue_item_id", None)
+        elapsed_time = getattr(queue, "elapsed_time", None)
+        time_last_updated = getattr(queue, "elapsed_time_last_updated", None)
+        playback_speed = getattr(queue, "playback_speed", None)
+        
+        # is there something playing (elapsed should be advancing)
+        is_playing = (
+            queue_item_id
+            and getattr(player_state, "value", player_state) == "playing"
+            and getattr(queue.state, "value", queue.state) == "playing"
+        )
+        
+        # are the vals valid
+        has_valid_timing = (
+            is_playing
+            and all(isinstance(value, (int, float)) and math.isfinite(value)
+                    for value in (elapsed_time, time_last_updated, playback_speed))
+        )
+        
+        if not has_valid_timing:
             self.sample = None
-            return elapsed
+            return corrected_elapsed_time
 
-        now = self.clock()
-        key = (getattr(queue, "queue_id", None), item_id, speed)
-        if self.sample is None or self.sample[0] != key or self.sample[1] != raw or updated < self.sample[2]:
-            self.sample = (key, raw, updated, now, elapsed)
-            return elapsed
-        _, _, first_updated, first_clock, first_elapsed = self.sample
-        if updated - first_updated < 1.5:
-            return elapsed
-        estimate = first_elapsed + max(0, now - first_clock) * speed
-        if isinstance(duration, (int, float)) and math.isfinite(duration) and duration > 0:
-            estimate = min(estimate, duration)
-        return estimate
+
+        current_monotonic_time = self.clock()
+        playback_details = (getattr(queue, "queueid", None), queue_item_id, playback_speed)
+        
+        # have the details of the stream changed? if theyre changing, then we are all good and can 
+        # return the default of corrected_elapsed_time
+        if (self.sample is None
+                or self.sample["playback_details"] != playback_details
+                or self.sample["elapsed_time"] != elapsed_time
+                or time_last_updated < self.sample["time_last_updated"]):
+            
+            
+            self.sample = {
+                "playback_details": playback_details,
+                "elapsed_time": elapsed_time,
+                "time_last_updated": time_last_updated,
+                "monotonic_time": current_monotonic_time,
+                "corrected_elapsed_time": corrected_elapsed_time,
+            }
+            
+            return corrected_elapsed_time
+        
+        
+        # if we are here, we are experiencing the bug
+        
+        baseline_time_last_updated = self.sample["time_last_updated"]
+        baseline_monotonic_time = self.sample["monotonic_time"]
+        baseline_corrected_elapsed_time = self.sample["corrected_elapsed_time"]
+        
+        # 2 seconds worth of updates until we consider it actually stale
+        if time_last_updated - baseline_time_last_updated < 2:
+            return corrected_elapsed_time
+        
+        # estimate the elpased time based on our clock
+        estimated_elapsed_time = baseline_corrected_elapsed_time + max(0, current_monotonic_time - baseline_monotonic_time) * playback_speed
+        
+    
+        return min(estimated_elapsed_time, track_duration)
 
 
 async def server_request(request):
-    try:
-        return await asyncio.wait_for(request, timeout=15)
-    except CONNECTION_ERRORS as error:
-        raise ServerConnectionError from error
-
-
-@asynccontextmanager
-async def connect_to_server(client):
-    async with AsyncExitStack() as stack:
-        await server_request(stack.enter_async_context(client))
-        yield client
+    return await asyncio.wait_for(request, timeout=15)
 
 
 def format_time(seconds):
@@ -94,36 +116,34 @@ def format_time(seconds):
 
 
 def wifi_signal_dbm(interface="wlan0", path=Path("/proc/net/wireless")):
+    
+    # Skipheader lines
     try:
         lines = path.read_text().splitlines()[2:]
     except OSError:
         return None
+    
     for line in lines:
+        # Find the row for the requested interface
         name, separator, values = line.partition(":")
+        
         if not separator or name.strip() != interface:
             continue
+        
         fields = values.split()
         try:
+            # The third field is signal level; Linux may append a dot to it.
             signal = float(fields[2].rstrip("."))
         except (IndexError, ValueError):
             return None
+        
+        # Some drivers report negative dBm values as unsigned 8-bit numbers.
         if 128 <= signal <= 255:
             signal -= 256
+            
+        # Reject values outside the expected negative dBm range.
         return signal if -127 <= signal < 0 else None
     return None
-
-
-@asynccontextmanager
-async def listen_for_events(client):
-    listener = asyncio.create_task(client.start_listening())
-    try:
-        await asyncio.sleep(0)
-        if listener.done():
-            await server_request(listener)
-        yield
-    finally:
-        listener.cancel()
-        await asyncio.gather(listener, return_exceptions=True)
 
 
 async def download_cover(session, url, server_url, token, destination):
@@ -149,7 +169,7 @@ async def download_cover(session, url, server_url, token, destination):
     destination.write_bytes(image)
 
 
-async def monitor_connection(output_worker):
+async def super_loop(output_worker, test_mode=False):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     server_url = os.environ.get("MA_URL")
@@ -171,15 +191,22 @@ async def monitor_connection(output_worker):
     previous_art = None
     elapsed_tracker = QueueElapsedTracker()
     
-    async with aiohttp.ClientSession() as session:
+    async with aiohttp.ClientSession() as session, AsyncExitStack() as connection_stack:
         client = MusicAssistantClient(server_url.rstrip("/"), session, token=token)
-        async with connect_to_server(client), listen_for_events(client):
+        await server_request(connection_stack.enter_async_context(client))
+        listener = asyncio.create_task(client.start_listening())
+        
+        
+        try:
+            await asyncio.sleep(0)
+            
+
             while True:
                 
                 
                 players = await server_request(client.send_command("players/all"))
                 
-                # make sure we are getting the data from the player 
+                # make sure we are getting the data from the correct player 
                 matches = [player for player in players
                            if player.get("name", player.get("display_name")) == player_name]
                 if not matches:
@@ -187,6 +214,7 @@ async def monitor_connection(output_worker):
                 player = Player.from_dict(matches[0])
                 
                 
+                # get the deets from the player
                 queue = await server_request(client.player_queues.get_active_queue(player.player_id))
                 item = queue.current_item if queue else None
                 next_item = queue.next_item if queue else None
@@ -199,29 +227,20 @@ async def monitor_connection(output_worker):
                     duration = item.duration
                     elapsed = elapsed_tracker.elapsed(queue, item, player.playback_state)
                     cover_url = client.get_image_url(item.image) if item.image else None
-                else:
-                    elapsed_tracker.sample = None
-                    media = player.current_media
-                    title = media.title if media else None
-                    artist = media.artist if media else None
-                    album = media.album if media else None
-                    duration = media.duration if media else None
-                    elapsed = player.corrected_elapsed_time
-                    cover_url = media.image_url if media else None
-                    
-    
+              
+                
+                # pull the artwork if we dont already have it
                 artwork = None
                 if cover_url:
-                    if cover_url != previous_art or not cover_path.is_file():
+                    if cover_url != previous_art:
                         previous_art = None
                         try:
                             await download_cover(session, cover_url, server_url, token, cover_path)
                             previous_art = cover_url
                         except (aiohttp.ClientError, asyncio.TimeoutError, OSError, ValueError) as error:
                             print("Cover download failed: {}".format(error), file=sys.stderr)
-                    if previous_art == cover_url:
+                    if cover_url == previous_art:
                         artwork = str(cover_path)
-                        
                 else:
                     previous_art = None
                     
@@ -239,32 +258,46 @@ async def monitor_connection(output_worker):
                     "next_title": next_item.name if next_item else None,
                     "artwork": artwork,
                 })
-                track_identifier = (getattr(media, "uri", None) or
-                                    getattr(item, "queue_item_id", None))
-                song_key = (track_identifier, title, artist, album) if track_identifier or title else None
+                
+             
+                song_key = (title, artist, album) if title else None
+                
                 output_worker.submit(image, song_key)
                 
-                print("Player: {} | State: {} | Volume: {}".format(player.name, player.playback_state, player.volume_level), flush=True)
-                print("Song: {} | Artist: {} | Album: {}".format(title or "unknown", artist or "unknown", album or "unknown"), flush=True)
-                print("Next: {}".format(next_item.name if next_item else "unavailable"), flush=True)
-                print("Time: {} / {} | Cover: {}\n".format(format_time(elapsed), format_time(duration), artwork or "unavailable"), flush=True)
+                if test_mode:
+                    print("Player: {} | State: {} | Volume: {}".format(player.name, player.playback_state, player.volume_level), flush=True)
+                    print("Song: {} | Artist: {} | Album: {}".format(title or "unknown", artist or "unknown", album or "unknown"), flush=True)
+                    print("Next: {}".format(next_item.name if next_item else "unavailable"), flush=True)
+                    print("Time: {} / {} | Cover: {}\n".format(format_time(elapsed), format_time(duration), artwork or "unavailable"), flush=True)
+                
                 await asyncio.sleep(1)
+        finally:
+            listener.cancel()
+            await asyncio.gather(listener, return_exceptions=True)
 
 
-async def main(output):
+async def main(output, test_mode=False):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
+    
+    # get these here for error message
     server_url = os.environ.get("MA_URL")
     if not server_url:
         raise SystemExit("Set MA_URL to your Music Assistant server URL, e.g. http://192.168.1.10:8095")
     player_name = os.environ.get("MA_PLAYER") or socket.gethostname()
+    
+    # output worker creates the pngs and renders to display
     async with OutputWorker(output) as output_worker:
         while True:
             try:
-                await monitor_connection(output_worker)
-            except ServerConnectionError:
-                print("{} cannot connect to {}. Retrying in 10 seconds.".format(player_name, server_url),
+                await super_loop(output_worker, test_mode=test_mode)
+            except CONNECTION_ERRORS as error:
+                
+                # if we can connect submit the error message to the worker
+                error_message = str(error) or type(error).__name__
+                print("{}: {}. Retrying in 10 seconds.".format(type(error).__name__, error_message),
                       file=sys.stderr, flush=True)
-                output_worker.submit(render_connection_error(player_name, server_url), None, urgent=True)
+                error_key = ("connection_error", type(error).__name__, error_message)
+                output_worker.submit(render_connection_error(player_name, server_url, error_message), error_key, urgent=True)
                 await asyncio.sleep(10)
 
 
@@ -273,45 +306,29 @@ def parse_args(argv=None):
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--test", action="store_true", help="save the UI to ui.png without using the display")
     mode.add_argument("--display", choices=["epd2in9_V2"], default="epd2in9_V2", help="display model (default: epd2in9_V2)")
-    parser.add_argument("--power-pin", type=int, help="verified display power-control BCM pin")
-    args = parser.parse_args(argv)
-    if not args.test and args.power_pin is None:
-        parser.error("display mode requires a verified --power-pin")
-    return args
+    return parser.parse_args(argv)
 
 
-def load_display_driver(model, power_pin):
+def load_display_driver(model):
     if model != "epd2in9_V2":
         raise ValueError("Unsupported display model")
-    if power_pin not in range(2, 28) or power_pin in RESERVED_PINS:
-        raise ValueError("Power pin conflicts with the DAC or display signals")
-    config = Path(__file__).resolve().parent / "lib/waveshare_epd/epdconfig.py"
-    tree = ast.parse(config.read_text())
-    for node in tree.body:
-        if isinstance(node, ast.ClassDef) and node.name == "RaspberryPi":
-            for statement in node.body:
-                if isinstance(statement, ast.Assign) and any(
-                    isinstance(target, ast.Name) and target.id == "PWR_PIN"
-                    for target in statement.targets
-                ):
-                    if ast.literal_eval(statement.value) != power_pin:
-                        raise ValueError("Power pin does not match the local Waveshare RaspberryPi configuration")
-                    from lib.waveshare_epd import epd2in9_V2
+    
+    from lib.waveshare_epd import epd2in9_V2
 
-                    return epd2in9_V2
-    raise ValueError("Cannot determine the Waveshare Raspberry Pi power pin")
+    return epd2in9_V2
 
 
+# we using the real thing or just making pngs
 def create_output(args):
     if args.test:
         return PreviewOutput("ui.png")
-    return DisplayOutput(load_display_driver(args.display, args.power_pin))
+    return DisplayOutput(load_display_driver(args.display))
 
 
 if __name__ == "__main__":
     args = parse_args()
     try:
         with create_output(args) as output:
-            asyncio.run(main(output))
+            asyncio.run(main(output, test_mode=args.test))
     except KeyboardInterrupt:
         pass

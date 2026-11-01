@@ -101,7 +101,7 @@ class DisplayOutput:
         return False
 
     def update(self, image, song_key=None, urgent=False):
-        if urgent or (self.has_displayed and song_key == self.previous_song):
+        if self.has_displayed and song_key == self.previous_song:
             return False
         if image.mode != "1" or image.size != (self.display.height, self.display.width):
             raise ValueError("Display image must be a landscape 1-bit image matching the panel")

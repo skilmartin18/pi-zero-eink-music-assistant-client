@@ -189,6 +189,7 @@ async def super_loop(output_worker, test_mode=False):
     cover_path = Path(os.environ.get("MA_COVER_PATH", "cover-art.jpg"))
     
     previous_art = None
+    previous_track = None
     elapsed_tracker = QueueElapsedTracker()
     
     async with aiohttp.ClientSession() as session, AsyncExitStack() as connection_stack:
@@ -227,6 +228,17 @@ async def super_loop(output_worker, test_mode=False):
                     duration = item.duration
                     elapsed = elapsed_tracker.elapsed(queue, item, player.playback_state)
                     cover_url = client.get_image_url(item.image) if item.image else None
+                    song_key = (getattr(media, "uri", None)
+                                or ((title, artist, album) if title else None)
+                                or getattr(item, "queue_item_id", None))
+                    previous_track = (title, artist, album, duration, cover_url, song_key)
+                else:
+                    elapsed_tracker.sample = None
+                    title, artist, album, duration, cover_url, song_key = (
+                        previous_track if previous_track is not None
+                        else (None, None, None, None, None, None)
+                    )
+                    elapsed = player.corrected_elapsed_time
              
               
                 
@@ -261,18 +273,6 @@ async def super_loop(output_worker, test_mode=False):
                 })
                 
              
-                elapsed_second = (
-                    max(0, int(elapsed))
-                    if isinstance(elapsed, (int, float)) and math.isfinite(elapsed)
-                    else None
-                )
-                track_duration = (
-                    duration if isinstance(duration, (int, float)) and math.isfinite(duration)
-                    else None
-                )
-                playback_state = getattr(player.playback_state, "value", player.playback_state)
-                song_key = (title, artist, album, elapsed_second, track_duration, playback_state)
-                
                 output_worker.submit(image, song_key)
                 
                 if test_mode:

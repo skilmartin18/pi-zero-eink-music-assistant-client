@@ -75,6 +75,8 @@ class DisplayOutput:
         self.display = driver.EPD()
         self.has_displayed = False
         self.previous_song = None
+        self.previous_image = None
+        self.showing_error = False
         self.initialized = False
 
     def __enter__(self):
@@ -101,21 +103,32 @@ class DisplayOutput:
         return False
 
     def update(self, image, song_key=None, urgent=False):
-        if self.has_displayed and song_key == self.previous_song:
-            return False
         if image.mode != "1" or image.size != (self.display.height, self.display.width):
             raise ValueError("Display image must be a landscape 1-bit image matching the panel")
-        if not self.has_displayed:
-            print("Drawing first now-playing image...", flush=True)
+        if not self.has_displayed or (not urgent and song_key is not None
+                          and song_key != self.previous_song):
+            if self.has_displayed:
+                self.display.sleep()
+                self.initialized = False
+                if self.display.init() != 0:
+                    raise RuntimeError("Display reinitialization failed")
+                self.initialized = True
             self.display.display_Base(self.display.getbuffer(image))
-            print("First display refresh complete.", flush=True)
+            self.previous_song = None if urgent else song_key
+            self.previous_image = image.copy()
+            self.showing_error = urgent
         else:
-            self.display.sleep()
-            self.initialized = False
-            if self.display.init() != 0:
-                raise RuntimeError("Display reinitialization failed")
-            self.initialized = True
-            self.display.display_Base(self.display.getbuffer(image))
+            if urgent or self.showing_error:
+                partial_image = image.copy()
+            else:
+                partial_image = self.previous_image.copy()
+                for region in ((0, 0, image.width - 168, 16), (0, 96, image.width, image.height)):
+                    partial_image.paste(image.crop(region), region)
+            if partial_image.tobytes() == self.previous_image.tobytes():
+                self.showing_error = urgent
+                return False
+            self.display.display_Partial(self.display.getbuffer(partial_image))
+            self.previous_image = partial_image
+            self.showing_error = urgent
         self.has_displayed = True
-        self.previous_song = song_key
         return True

@@ -43,10 +43,10 @@ def _draw_wifi(draw, x, signal):
         draw.arc((x, 3, x + 14, 17), 220, 320, fill=0, width=2)
 
 
-def render_connection_error(player_name, server_url, width=296, height=128, font_path=DEFAULT_FONT):
+def render_connection_error(player_name, server_url, error_message, width=296, height=128, font_path=DEFAULT_FONT):
     image = Image.new("1", (width, height), 255)
     draw = ImageDraw.Draw(image)
-    message = "{} cannot connect to {}".format(player_name, server_url)
+    message = "{}: {} ({}).".format(player_name, error_message, server_url)
     for size in range(16, 7, -1):
         font = ImageFont.truetype(str(font_path), size)
         lines = []

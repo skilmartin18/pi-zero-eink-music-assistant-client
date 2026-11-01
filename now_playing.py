@@ -186,7 +186,7 @@ def parse_args(argv=None):
     mode.add_argument("--preview", metavar="PNG", default=None, help="save a preview PNG (default: now-playing-preview.png)")
     mode.add_argument("--display", choices=["epd2in9_V2"], help="render on the selected display")
     parser.add_argument("--power-pin", type=int, help="verified display power-control BCM pin")
-    parser.add_argument("--refresh-interval", type=float, default=30, help="minimum seconds between display refreshes (default: 30)")
+    parser.add_argument("--refresh-interval", type=float, default=0, help="minimum seconds between display refreshes (default: 0)")
     parser.add_argument("--full-refresh-every", type=int, default=10, help="partial refreshes before a full refresh (default: 10)")
     args = parser.parse_args(argv)
     if args.display and args.power_pin is None:

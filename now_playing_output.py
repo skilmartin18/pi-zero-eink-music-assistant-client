@@ -9,6 +9,7 @@ class PreviewOutput:
         self.path = Path(path)
 
     def __enter__(self):
+        print("Output mode: preview ({})".format(self.path), flush=True)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -34,9 +35,11 @@ class DisplayOutput:
 
     def __enter__(self):
         try:
+            print("Output mode: e-paper; initializing display...", flush=True)
             if self.display.init() != 0:
                 raise RuntimeError("Display initialization failed")
             self.initialized = True
+            print("Display initialized; waiting for Music Assistant data...", flush=True)
         except BaseException:
             self.driver.epdconfig.module_exit(cleanup=True)
             raise
@@ -63,7 +66,9 @@ class DisplayOutput:
         if self.last_refresh is not None and now - self.last_refresh < self.min_interval:
             return False
         if self.previous_frame is None:
+            print("Drawing first now-playing image...", flush=True)
             self.display.display_Base(self.display.getbuffer(image))
+            print("First display refresh complete.", flush=True)
             self.partial_count = 0
         elif self.partial_count >= self.full_refresh_every:
             self.display.sleep()

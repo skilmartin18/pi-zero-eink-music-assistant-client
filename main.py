@@ -190,6 +190,7 @@ async def super_loop(output_worker, test_mode=False):
     
     previous_art = None
     previous_track = None
+    received_data = False
     elapsed_tracker = QueueElapsedTracker()
     
     async with aiohttp.ClientSession() as session, AsyncExitStack() as connection_stack:
@@ -217,6 +218,10 @@ async def super_loop(output_worker, test_mode=False):
                 
                 # get the deets from the player
                 queue = await server_request(client.player_queues.get_active_queue(player.player_id))
+                if not received_data:
+                    print("Receiving Music Assistant data.", flush=True)
+                    received_data = True
+                
                 item = queue.current_item if queue else None
                 next_item = queue.next_item if queue else None
                 if item:

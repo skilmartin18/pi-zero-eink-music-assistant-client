@@ -196,6 +196,7 @@ def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
                 
                 
                 players = client.send_command("players/all")
+                players_end = time.monotonic()
                 
                 # make sure we are getting the data from the correct player 
                 matches = [player for player in players
@@ -207,6 +208,7 @@ def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
                 
                 # get the deets from the player
                 queue = client.get_active_queue(player.player_id)
+                queue_end = time.monotonic()
                 if not received_data:
                     print("Receiving Music Assistant data.", flush=True)
                     received_data = True
@@ -253,11 +255,13 @@ def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
 
                 party_url = None
                 party_error = None
+                party_start = time.monotonic()
                 if party_qr:
                     try:
                         party_url = client.send_command("party/url")
                     except (InvalidCommand, ProviderUnavailableError, InsufficientPermissions) as error:
                         party_error = str(error)
+                render_start = time.monotonic()
                     
                 # create the image of the ui
                 image = render_now_playing({
@@ -282,6 +286,9 @@ def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
                     display_end = time.monotonic()
                     print("Loop: data/render {:.3f}s, submit {:.3f}s".format(
                         display_start - iteration_start, display_end - display_start), flush=True)
+                    print("Timing: players {:.3f}s, queue {:.3f}s, party {:.3f}s, render {:.3f}s".format(
+                        players_end - iteration_start, queue_end - players_end,
+                        render_start - party_start, display_start - render_start), flush=True)
                 
                 if test_mode:
                     print("Player: {} | State: {} | Volume: {}".format(player.name, player.playback_state, player.volume_level), flush=True)

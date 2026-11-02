@@ -13,7 +13,9 @@ import socket
 import aiohttp
 from dotenv import load_dotenv
 from music_assistant_client.exceptions import InvalidServerVersion, InvalidState, NotConnected, TransportError
-from music_assistant_models.errors import AuthenticationFailed, AuthenticationRequired, InvalidToken
+from music_assistant_models.errors import (AuthenticationFailed, AuthenticationRequired,
+                                         InsufficientPermissions, InvalidCommand, InvalidToken,
+                                         ProviderUnavailableError)
 from music_assistant_models.player import Player
 
 from generate_ui import render_connection_error, render_now_playing
@@ -247,6 +249,13 @@ def super_loop(output, test_mode=False):
                         artwork = str(cover_path)
                 else:
                     previous_art = None
+
+                try:
+                    party_url = client.send_command("party/url")
+                    party_error = None
+                except (InvalidCommand, ProviderUnavailableError, InsufficientPermissions) as error:
+                    party_url = None
+                    party_error = str(error)
                     
                 # create the image of the ui
                 image = render_now_playing({
@@ -261,6 +270,7 @@ def super_loop(output, test_mode=False):
                     "duration": duration,
                     "next_title": next_item.name if next_item else None,
                     "artwork": artwork,
+                    "party_url": party_url,
                 })
                 
                  # output ui to image or display
@@ -270,6 +280,7 @@ def super_loop(output, test_mode=False):
                     print("Player: {} | State: {} | Volume: {}".format(player.name, player.playback_state, player.volume_level), flush=True)
                     print("Song: {} | Artist: {} | Album: {}".format(title or "unknown", artist or "unknown", album or "unknown"), flush=True)
                     print("Next: {}".format(next_item.name if next_item else "unavailable"), flush=True)
+                    print("Party URL: {}".format(party_url or ("unavailable ({})".format(party_error) if party_error else "unavailable")), flush=True)
                     print("Time: {} / {} | Cover: {}\n".format(format_time(elapsed), format_time(duration), artwork or "unavailable"), flush=True)
                 
                 time.sleep(1)

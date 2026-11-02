@@ -3,7 +3,9 @@
 import math
 from pathlib import Path
 
+import qrcode
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+from qrcode.exceptions import DataOverflowError
 
 FONT_DIR = Path(__file__).resolve().parent / "fonts" / "static"
 DEFAULT_FONT = FONT_DIR / "PixelifySans-Regular.ttf"
@@ -36,11 +38,27 @@ def _draw_wifi(draw, x, signal):
         draw.arc((x, 3, x + 14, 17), 220, 320, fill=0)
         draw.line((x + 2, 3, x + 13, 14), fill=0, width=2)
         return
-    draw.arc((x + 4, 9, x + 10, 15), 220, 320, fill=0, width=2)
+
+    draw.arc((x + 4, 9, x + 10, 15), 220, 320, fill=0, width=1)
     if signal >= -80:
-        draw.arc((x + 2, 6, x + 12, 16), 220, 320, fill=0, width=2)
+        draw.arc((x + 2, 6, x + 12, 16), 220, 320, fill=0, width=1)
     if signal >= -60:
-        draw.arc((x, 3, x + 14, 17), 220, 320, fill=0, width=2)
+        draw.arc((x, 3, x + 14, 17), 220, 320, fill=0, width=1)
+
+
+def _party_qr(url, max_size=72):
+    code = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=1, border=4)
+    try:
+        code.add_data(url)
+        code.make(fit=True)
+    except (DataOverflowError, ValueError):
+        return None
+    modules = code.modules_count + 2 * code.border
+    scale = max_size // modules
+    if not scale:
+        return None
+    qr_image = code.make_image(fill_color="black", back_color="white").get_image().convert("1")
+    return qr_image.resize((modules * scale, modules * scale), Image.Resampling.NEAREST)
 
 
 def render_connection_error(player_name, server_url, error_message, width=296, height=128, font_path=DEFAULT_FONT):
@@ -115,26 +133,47 @@ def render_now_playing(data, width=296, height=128, font_path=DEFAULT_FONT, bold
     draw.rectangle((8, 21, 79, 92), outline=0)
 
     text_x = 88
-    text_width = width - text_x - 8
+    text_right = width - 8
+    progress_right = width - 9
+    party_url = data.get("party_url")
+    qr_image = _party_qr(party_url) if party_url else None
+    reserved_regions = []
+    if qr_image:
+        qr_x = width - 8 - qr_image.width
+        qr_y = 97 - qr_image.height
+        image.paste(qr_image, (qr_x, qr_y))
+        join_position = (qr_x + qr_image.width // 2, qr_y - 1)
+        for size in range(14, 7, -1):
+            join_font = ImageFont.truetype(str(font_path), size)
+            join_bounds = draw.textbbox(join_position, "join", font=join_font, anchor="mb")
+            if join_bounds[1] >= 18:
+                break
+        draw.text(join_position, "join", font=join_font, fill=0, anchor="mb")
+        reserved_regions = [(qr_x, qr_y, qr_x + qr_image.width, 97), join_bounds]
     for y, value, font in (
         (20, data.get("title") or "Unknown song", title_font),
         (45, data.get("artist") or "Unknown artist", body_font),
         (64, data.get("album") or "Unknown album", body_font),
         (82, "Next: " + str(data.get("next_title") or "--"), small_font),
     ):
-        draw.text((text_x, y), _fit_text(draw, value, font, text_width), font=font, fill=0)
+        bounds = draw.textbbox((text_x, y), str(value), font=font)
+        line_right = text_right
+        for left, top, right, bottom in reserved_regions:
+            if bounds[1] < bottom and bounds[3] > top:
+                line_right = min(line_right, left - 4)
+        draw.text((text_x, y), _fit_text(draw, value, font, line_right - text_x), font=font, fill=0)
 
     elapsed = data.get("elapsed")
     duration = data.get("duration")
-    draw.rectangle((8, 99, width - 9, 104), outline=0)
+    draw.rectangle((8, 99, progress_right, 104), outline=0)
     if (isinstance(elapsed, (int, float)) and math.isfinite(elapsed)
             and isinstance(duration, (int, float)) and math.isfinite(duration) and duration > 0):
         progress = max(0, min(1, elapsed / duration))
-        fill_width = int((width - 18) * progress)
+        fill_width = int((progress_right - 9) * progress)
         if fill_width:
             draw.rectangle((9, 100, 8 + fill_width, 103), fill=0)
     draw.text((8, 108), _format_time(elapsed), font=small_font, fill=0)
     duration_text = _format_time(duration)
-    draw.text((width - 8 - draw.textlength(duration_text, font=small_font), 108),
+    draw.text((progress_right + 1 - draw.textlength(duration_text, font=small_font), 108),
               duration_text, font=small_font, fill=0)
     return image

@@ -1,29 +1,28 @@
 """Monitor a Music Assistant player and render its now-playing screen."""
 
 import argparse
-import asyncio
 import math
 import os
 import sys
 import time
-from contextlib import AsyncExitStack
 from pathlib import Path
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from urllib.parse import urljoin, urlsplit
 import socket 
 
 import aiohttp
 from dotenv import load_dotenv
-from music_assistant_client import MusicAssistantClient
 from music_assistant_client.exceptions import InvalidServerVersion, InvalidState, NotConnected, TransportError
 from music_assistant_models.errors import AuthenticationFailed, AuthenticationRequired, InvalidToken
 from music_assistant_models.player import Player
 
 from generate_ui import render_connection_error, render_now_playing
-from render_ui import DisplayOutput, OutputWorker, PreviewOutput
+from music_assistant_client_synchronous import MusicAssistantClientSynchronous
+from render_ui import DisplayOutput, PreviewOutput
 
 
 CONNECTION_ERRORS = (TransportError, NotConnected, InvalidState, InvalidServerVersion,
-                     aiohttp.ClientError, asyncio.TimeoutError, AuthenticationFailed,
+                     aiohttp.ClientError, TimeoutError, AuthenticationFailed,
                      AuthenticationRequired, InvalidToken)
 
 
@@ -104,10 +103,6 @@ class QueueElapsedTracker:
         return min(estimated_elapsed_time, track_duration)
 
 
-async def server_request(request):
-    return await asyncio.wait_for(request, timeout=15)
-
-
 def format_time(seconds):
     if seconds is None:
         return "unknown"
@@ -146,21 +141,21 @@ def wifi_signal_dbm(interface="wlan0", path=Path("/proc/net/wireless")):
     return None
 
 
-async def download_cover(session, url, server_url, token, destination):
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, request, response, code, message, headers, new_url):
+        return None
+
+
+def download_cover(url, server_url, token, destination):
     url = urljoin(server_url.rstrip("/") + "/", url)
-    source = urlsplit(url)
-    server = urlsplit(server_url)
-    if source.scheme not in ("http", "https"):
-        raise ValueError("Unsupported cover art URL")
-    same_origin = (source.scheme, source.hostname, source.port) == (server.scheme, server.hostname, server.port)
-    headers = {"Authorization": "Bearer " + token} if token and same_origin else {}
-    async with session.get(url, headers=headers, allow_redirects=False,
-                           timeout=aiohttp.ClientTimeout(total=10)) as response:
-        response.raise_for_status()
-        if response.status != 200 or not response.content_type.startswith("image/"):
+    
+    headers = {"Authorization": "Bearer " + token} 
+    request = Request(url, headers=headers)
+    with build_opener(NoRedirect()).open(request, timeout=10) as response:
+        if response.status != 200 or not response.headers.get_content_type().startswith("image/"):
             raise ValueError("Cover art response is not an image")
         image = bytearray()
-        async for chunk in response.content.iter_chunked(65536):
+        while chunk := response.read(65536):
             image.extend(chunk)
             if len(image) > 5 * 1024 * 1024:
                 raise ValueError("Cover art exceeds 5 MiB")
@@ -169,7 +164,7 @@ async def download_cover(session, url, server_url, token, destination):
     destination.write_bytes(image)
 
 
-async def super_loop(output_worker, test_mode=False):
+def super_loop(output, test_mode=False):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     server_url = os.environ.get("MA_URL")
@@ -193,20 +188,11 @@ async def super_loop(output_worker, test_mode=False):
     received_data = False
     elapsed_tracker = QueueElapsedTracker()
     
-    async with aiohttp.ClientSession() as session, AsyncExitStack() as connection_stack:
-        client = MusicAssistantClient(server_url.rstrip("/"), session, token=token)
-        await server_request(connection_stack.enter_async_context(client))
-        listener = asyncio.create_task(client.start_listening())
-        
-        
-        try:
-            await asyncio.sleep(0)
-            
-
+    with MusicAssistantClientSynchronous(server_url.rstrip("/"), token) as client:
             while True:
                 
                 
-                players = await server_request(client.send_command("players/all"))
+                players = client.send_command("players/all")
                 
                 # make sure we are getting the data from the correct player 
                 matches = [player for player in players
@@ -217,7 +203,7 @@ async def super_loop(output_worker, test_mode=False):
                 
                 
                 # get the deets from the player
-                queue = await server_request(client.player_queues.get_active_queue(player.player_id))
+                queue = client.get_active_queue(player.player_id)
                 if not received_data:
                     print("Receiving Music Assistant data.", flush=True)
                     received_data = True
@@ -253,16 +239,16 @@ async def super_loop(output_worker, test_mode=False):
                     if cover_url != previous_art:
                         previous_art = None
                         try:
-                            await download_cover(session, cover_url, server_url, token, cover_path)
+                            download_cover(cover_url, server_url, token, cover_path)
                             previous_art = cover_url
-                        except (aiohttp.ClientError, asyncio.TimeoutError, OSError, ValueError) as error:
+                        except (OSError, ValueError) as error:
                             print("Cover download failed: {}".format(error), file=sys.stderr)
                     if cover_url == previous_art:
                         artwork = str(cover_path)
                 else:
                     previous_art = None
                     
-                
+                # create the image of the ui
                 image = render_now_playing({
                     "player_name": player.name,
                     "wifi_signal_dbm": wifi_signal_dbm(os.environ.get("WIFI_INTERFACE") or "wlan0"),
@@ -277,8 +263,8 @@ async def super_loop(output_worker, test_mode=False):
                     "artwork": artwork,
                 })
                 
-             
-                output_worker.submit(image, song_key)
+                 # output ui to image or display
+                output.update(image, song_key)
                 
                 if test_mode:
                     print("Player: {} | State: {} | Volume: {}".format(player.name, player.playback_state, player.volume_level), flush=True)
@@ -286,13 +272,10 @@ async def super_loop(output_worker, test_mode=False):
                     print("Next: {}".format(next_item.name if next_item else "unavailable"), flush=True)
                     print("Time: {} / {} | Cover: {}\n".format(format_time(elapsed), format_time(duration), artwork or "unavailable"), flush=True)
                 
-                await asyncio.sleep(1)
-        finally:
-            listener.cancel()
-            await asyncio.gather(listener, return_exceptions=True)
+                time.sleep(1)
 
 
-async def main(output, test_mode=False):
+def main(output, test_mode=False):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     # get these here for error message
@@ -301,20 +284,16 @@ async def main(output, test_mode=False):
         raise SystemExit("Set MA_URL to your Music Assistant server URL, e.g. http://192.168.1.10:8095")
     player_name = os.environ.get("MA_PLAYER") or socket.gethostname()
     
-    # output worker creates the pngs and renders to display
-    async with OutputWorker(output) as output_worker:
-        while True:
-            try:
-                await super_loop(output_worker, test_mode=test_mode)
-            except CONNECTION_ERRORS as error:
-                
-                # if we can connect submit the error message to the worker
-                error_message = str(error) or type(error).__name__
-                print("{}: {}. Retrying in 10 seconds.".format(type(error).__name__, error_message),
-                      file=sys.stderr, flush=True)
-                error_key = ("connection_error", type(error).__name__, error_message)
-                output_worker.submit(render_connection_error(player_name, server_url, error_message), error_key, urgent=True)
-                await asyncio.sleep(10)
+    while True:
+        try:
+            super_loop(output, test_mode=test_mode)
+        except CONNECTION_ERRORS as error:
+            error_message = str(error) or type(error).__name__
+            print("{}: {}. Retrying in 10 seconds.".format(type(error).__name__, error_message),
+                  file=sys.stderr, flush=True)
+            error_key = ("connection_error", type(error).__name__, error_message)
+            output.update(render_connection_error(player_name, server_url, error_message), error_key, urgent=True)
+            time.sleep(10)
 
 
 def parse_args(argv=None):
@@ -336,6 +315,6 @@ if __name__ == "__main__":
     args = parse_args()
     try:
         with create_output(args) as output:
-            asyncio.run(main(output, test_mode=args.test))
+            main(output, test_mode=args.test)
     except KeyboardInterrupt:
         pass

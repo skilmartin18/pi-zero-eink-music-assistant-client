@@ -1,7 +1,6 @@
 """Output now-playing images to a PNG or a Waveshare display."""
 
 from pathlib import Path
-from time import monotonic
 
 # for testing we want to save an image as png, not display to the screen
 class PreviewOutput:
@@ -20,9 +19,8 @@ class PreviewOutput:
 
 
 class DisplayOutput:
-    def __init__(self, driver, timing=False):
+    def __init__(self, driver):
         self.driver = driver
-        self.timing = timing
         self.display = driver.EPD()
         self.has_displayed = False
         self.previous_song = None
@@ -79,14 +77,8 @@ class DisplayOutput:
         return True
 
     def _display_image(self, image, full):
-        started = monotonic()
         buffer = self.display.getbuffer(image)
-        converted = monotonic()
         if full:
             self.display.display_Base(buffer)
         else:
             self.display.display_Partial(buffer)
-        finished = monotonic()
-        if self.timing:
-            print("Display {}: buffer {:.3f}s, refresh {:.3f}s".format(
-                "full" if full else "partial", converted - started, finished - converted), flush=True)

@@ -47,7 +47,7 @@ def _draw_wifi(draw, x, signal):
         draw.arc((x, 3, x + 14, 17), 220, 320, fill=0, width=1)
 
 
-@lru_cache(maxsize=8)
+@lru_cache(maxsize=1)
 def _party_qr(url, max_size=72):
     code = qrcode.QRCode(error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=1, border=4)
     try:

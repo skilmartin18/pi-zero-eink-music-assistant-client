@@ -192,6 +192,7 @@ def super_loop(output, test_mode=False, party_qr=False):
     
     with MusicAssistantClientSynchronous(server_url.rstrip("/"), token) as client:
             while True:
+                iteration_start = time.monotonic()
                 
                 
                 players = client.send_command("players/all")
@@ -285,7 +286,7 @@ def super_loop(output, test_mode=False, party_qr=False):
                         print("Party URL: {}".format(party_url or ("unavailable ({})".format(party_error) if party_error else "unavailable")), flush=True)
                     print("Time: {} / {} | Cover: {}\n".format(format_time(elapsed), format_time(duration), artwork or "unavailable"), flush=True)
                 
-                time.sleep(1)
+                time.sleep(max(0, 1 - (time.monotonic() - iteration_start)))
 
 
 def main(output, test_mode=False, party_qr=False):

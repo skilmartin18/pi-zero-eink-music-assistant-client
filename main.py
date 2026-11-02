@@ -166,7 +166,7 @@ def download_cover(url, server_url, token, destination):
     destination.write_bytes(image)
 
 
-def super_loop(output, test_mode=False):
+def super_loop(output, test_mode=False, party_qr=False):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     server_url = os.environ.get("MA_URL")
@@ -250,12 +250,13 @@ def super_loop(output, test_mode=False):
                 else:
                     previous_art = None
 
-                try:
-                    party_url = client.send_command("party/url")
-                    party_error = None
-                except (InvalidCommand, ProviderUnavailableError, InsufficientPermissions) as error:
-                    party_url = None
-                    party_error = str(error)
+                party_url = None
+                party_error = None
+                if party_qr:
+                    try:
+                        party_url = client.send_command("party/url")
+                    except (InvalidCommand, ProviderUnavailableError, InsufficientPermissions) as error:
+                        party_error = str(error)
                     
                 # create the image of the ui
                 image = render_now_playing({
@@ -280,13 +281,14 @@ def super_loop(output, test_mode=False):
                     print("Player: {} | State: {} | Volume: {}".format(player.name, player.playback_state, player.volume_level), flush=True)
                     print("Song: {} | Artist: {} | Album: {}".format(title or "unknown", artist or "unknown", album or "unknown"), flush=True)
                     print("Next: {}".format(next_item.name if next_item else "unavailable"), flush=True)
-                    print("Party URL: {}".format(party_url or ("unavailable ({})".format(party_error) if party_error else "unavailable")), flush=True)
+                    if party_qr:
+                        print("Party URL: {}".format(party_url or ("unavailable ({})".format(party_error) if party_error else "unavailable")), flush=True)
                     print("Time: {} / {} | Cover: {}\n".format(format_time(elapsed), format_time(duration), artwork or "unavailable"), flush=True)
                 
                 time.sleep(1)
 
 
-def main(output, test_mode=False):
+def main(output, test_mode=False, party_qr=False):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     # get these here for error message
@@ -297,7 +299,7 @@ def main(output, test_mode=False):
     
     while True:
         try:
-            super_loop(output, test_mode=test_mode)
+            super_loop(output, test_mode=test_mode, party_qr=party_qr)
         except CONNECTION_ERRORS as error:
             error_message = str(error) or type(error).__name__
             print("{}: {}. Retrying in 10 seconds.".format(type(error).__name__, error_message),
@@ -310,6 +312,7 @@ def main(output, test_mode=False):
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test", action="store_true", help="save the UI to ui.png without using the display")
+    parser.add_argument("--party-qr", action="store_true", help="show the Party guest join QR code")
     return parser.parse_args(argv)
 
 
@@ -326,6 +329,6 @@ if __name__ == "__main__":
     args = parse_args()
     try:
         with create_output(args) as output:
-            main(output, test_mode=args.test)
+            main(output, test_mode=args.test, party_qr=args.party_qr)
     except KeyboardInterrupt:
         pass

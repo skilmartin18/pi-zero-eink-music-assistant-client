@@ -1,7 +1,65 @@
 """Output now-playing images to a PNG or a Waveshare display."""
 
 from pathlib import Path
+from threading import Condition, Thread
 from time import monotonic
+
+class OutputWorker:
+    def __init__(self, output, timing=False):
+        self.output = output
+        self.timing = timing
+        self.condition = Condition()
+        self.pending = None
+        self.pending_error = None
+        self.stopping = False
+        self.error = None
+        self.thread = Thread(target=self._run, name="display-output")
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        with self.condition:
+            self.stopping = True
+            self.condition.notify()
+        self.thread.join()
+        if exc_type is None and self.error is not None:
+            raise RuntimeError("Output worker failed") from self.error
+        return False
+
+    def update(self, image, song_key=None, urgent=False):
+        with self.condition:
+            if self.error is not None:
+                raise RuntimeError("Output worker failed") from self.error
+            if urgent:
+                self.pending = None
+                self.pending_error = (image, song_key, urgent)
+            else:
+                self.pending = (image, song_key, urgent)
+            self.condition.notify()
+
+    def _run(self):
+        while True:
+            with self.condition:
+                self.condition.wait_for(lambda: self.stopping or self.pending_error is not None or self.pending is not None)
+                if self.stopping:
+                    return
+                if self.pending_error is not None:
+                    image, song_key, urgent = self.pending_error
+                    self.pending_error = None
+                else:
+                    image, song_key, urgent = self.pending
+                    self.pending = None
+            try:
+                started = monotonic()
+                self.output.update(image, song_key, urgent=urgent)
+                if self.timing:
+                    print("Output: {:.3f}s".format(monotonic() - started), flush=True)
+            except BaseException as error:
+                with self.condition:
+                    self.error = error
+                return
 
 # for testing we want to save an image as png, not display to the screen
 class PreviewOutput:

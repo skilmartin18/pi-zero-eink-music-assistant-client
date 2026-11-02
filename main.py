@@ -20,7 +20,7 @@ from music_assistant_models.player import Player
 
 from generate_ui import render_connection_error, render_now_playing
 from music_assistant_client_synchronous import MusicAssistantClientSynchronous
-from render_ui import DisplayOutput, PreviewOutput
+from render_ui import DisplayOutput, OutputWorker, PreviewOutput
 
 
 CONNECTION_ERRORS = (TransportError, NotConnected, InvalidState, InvalidServerVersion,
@@ -280,7 +280,7 @@ def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
                 output.update(image, song_key)
                 if display_timing:
                     display_end = time.monotonic()
-                    print("Loop: data/render {:.3f}s, output {:.3f}s".format(
+                    print("Loop: data/render {:.3f}s, submit {:.3f}s".format(
                         display_start - iteration_start, display_end - display_start), flush=True)
                 
                 if test_mode:
@@ -336,6 +336,7 @@ if __name__ == "__main__":
     args = parse_args()
     try:
         with create_output(args) as output:
-            main(output, test_mode=args.test, party_qr=args.party_qr, display_timing=args.display_timing)
+            with OutputWorker(output, timing=args.display_timing) as worker:
+                main(worker, test_mode=args.test, party_qr=args.party_qr, display_timing=args.display_timing)
     except KeyboardInterrupt:
         pass

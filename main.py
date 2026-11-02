@@ -166,7 +166,7 @@ def download_cover(url, server_url, token, destination):
     destination.write_bytes(image)
 
 
-def super_loop(output, test_mode=False, party_qr=False):
+def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     server_url = os.environ.get("MA_URL")
@@ -276,7 +276,12 @@ def super_loop(output, test_mode=False, party_qr=False):
                 })
                 
                  # output ui to image or display
+                display_start = time.monotonic()
                 output.update(image, song_key)
+                if display_timing:
+                    display_end = time.monotonic()
+                    print("Loop: data/render {:.3f}s, output {:.3f}s".format(
+                        display_start - iteration_start, display_end - display_start), flush=True)
                 
                 if test_mode:
                     print("Player: {} | State: {} | Volume: {}".format(player.name, player.playback_state, player.volume_level), flush=True)
@@ -289,7 +294,7 @@ def super_loop(output, test_mode=False, party_qr=False):
                 time.sleep(max(0, 1 - (time.monotonic() - iteration_start)))
 
 
-def main(output, test_mode=False, party_qr=False):
+def main(output, test_mode=False, party_qr=False, display_timing=False):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     # get these here for error message
@@ -300,7 +305,7 @@ def main(output, test_mode=False, party_qr=False):
     
     while True:
         try:
-            super_loop(output, test_mode=test_mode, party_qr=party_qr)
+            super_loop(output, test_mode=test_mode, party_qr=party_qr, display_timing=display_timing)
         except CONNECTION_ERRORS as error:
             error_message = str(error) or type(error).__name__
             print("{}: {}. Retrying in 10 seconds.".format(type(error).__name__, error_message),
@@ -314,6 +319,7 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test", action="store_true", help="save the UI to ui.png without using the display")
     parser.add_argument("--party-qr", action="store_true", help="show the Party guest join QR code")
+    parser.add_argument("--display-timing", action="store_true", help="print display and loop timings")
     return parser.parse_args(argv)
 
 
@@ -323,13 +329,13 @@ def create_output(args):
         return PreviewOutput("ui.png")
     from lib.waveshare_epd import epd2in9_V2
 
-    return DisplayOutput(epd2in9_V2)
+    return DisplayOutput(epd2in9_V2, timing=args.display_timing)
 
 
 if __name__ == "__main__":
     args = parse_args()
     try:
         with create_output(args) as output:
-            main(output, test_mode=args.test, party_qr=args.party_qr)
+            main(output, test_mode=args.test, party_qr=args.party_qr, display_timing=args.display_timing)
     except KeyboardInterrupt:
         pass

@@ -1,6 +1,7 @@
 """Output now-playing images to a PNG or a Waveshare display."""
 
 from pathlib import Path
+from time import monotonic
 
 # for testing we want to save an image as png, not display to the screen
 class PreviewOutput:
@@ -19,8 +20,9 @@ class PreviewOutput:
 
 
 class DisplayOutput:
-    def __init__(self, driver):
+    def __init__(self, driver, timing=False):
         self.driver = driver
+        self.timing = timing
         self.display = driver.EPD()
         self.has_displayed = False
         self.previous_song = None
@@ -64,14 +66,27 @@ class DisplayOutput:
                     raise RuntimeError("Display reinitialization failed")
                 self.initialized = True
                 
-            self.display.display_Base(self.display.getbuffer(image))
+            self._display_image(image, full=True)
             self.previous_song = None if urgent else song_key
             self.previous_image = image.copy()
             
         else:
             if image.tobytes() == self.previous_image.tobytes():
                 return False
-            self.display.display_Partial(self.display.getbuffer(image))
+            self._display_image(image, full=False)
             self.previous_image = image.copy()
         self.has_displayed = True
         return True
+
+    def _display_image(self, image, full):
+        started = monotonic()
+        buffer = self.display.getbuffer(image)
+        converted = monotonic()
+        if full:
+            self.display.display_Base(buffer)
+        else:
+            self.display.display_Partial(buffer)
+        finished = monotonic()
+        if self.timing:
+            print("Display {}: buffer {:.3f}s, refresh {:.3f}s".format(
+                "full" if full else "partial", converted - started, finished - converted), flush=True)

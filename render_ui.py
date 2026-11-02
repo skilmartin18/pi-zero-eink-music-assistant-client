@@ -1,57 +1,6 @@
 """Output now-playing images to a PNG or a Waveshare display."""
 
-import asyncio
 from pathlib import Path
-
-
-class OutputWorker:
-    def __init__(self, output):
-        self.output = output
-        self.pending = None
-        self.pending_error = None
-        self.wake = asyncio.Event()
-        self.stopping = False
-        self.task = None
-
-    async def __aenter__(self):
-        self.task = asyncio.create_task(self.run())
-        return self
-
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        self.stopping = True
-        self.wake.set()
-        await self.task
-        return False
-
-    def submit(self, image, song_key, urgent=False):
-        if self.task.done():
-            self.task.result()
-            raise RuntimeError("Display worker stopped unexpectedly")
-        if urgent:
-            self.pending_error = (image, song_key, urgent)
-            self.pending = None
-        else:
-            self.pending = (image, song_key, urgent)
-        self.wake.set()
-
-    async def run(self):
-        while True:
-            await self.wake.wait()
-            self.wake.clear()
-            if self.stopping:
-                return
-            if self.pending_error is not None:
-                image, song_key, urgent = self.pending_error
-                self.pending_error = None
-                if self.pending is not None:
-                    self.wake.set()
-            else:
-                image, song_key, urgent = self.pending
-                self.pending = None
-            if urgent:
-                await asyncio.to_thread(self.output.update, image, song_key, urgent=True)
-            else:
-                await asyncio.to_thread(self.output.update, image, song_key)
 
 
 class PreviewOutput:

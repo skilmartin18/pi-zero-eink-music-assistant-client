@@ -166,7 +166,7 @@ def download_cover(url, server_url, token, destination):
     destination.write_bytes(image)
 
 
-def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
+def super_loop(output, test_mode=False, party_qr=False):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     server_url = os.environ.get("MA_URL")
@@ -196,7 +196,6 @@ def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
                 
                 
                 players = client.send_command("players/all")
-                players_end = time.monotonic()
                 
                 # make sure we are getting the data from the correct player 
                 matches = [player for player in players
@@ -208,7 +207,6 @@ def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
                 
                 # get the deets from the player
                 queue = client.get_active_queue(player.player_id)
-                queue_end = time.monotonic()
                 if not received_data:
                     print("Receiving Music Assistant data.", flush=True)
                     received_data = True
@@ -255,13 +253,11 @@ def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
 
                 party_url = None
                 party_error = None
-                party_start = time.monotonic()
                 if party_qr:
                     try:
                         party_url = client.send_command("party/url")
                     except (InvalidCommand, ProviderUnavailableError, InsufficientPermissions) as error:
                         party_error = str(error)
-                render_start = time.monotonic()
                     
                 # create the image of the ui
                 image = render_now_playing({
@@ -280,15 +276,7 @@ def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
                 })
                 
                  # output ui to image or display
-                display_start = time.monotonic()
                 output.update(image, song_key)
-                if display_timing:
-                    display_end = time.monotonic()
-                    print("Loop: data/render {:.3f}s, output {:.3f}s".format(
-                        display_start - iteration_start, display_end - display_start), flush=True)
-                    print("Timing: players {:.3f}s, queue {:.3f}s, party {:.3f}s, render {:.3f}s".format(
-                        players_end - iteration_start, queue_end - players_end,
-                        render_start - party_start, display_start - render_start), flush=True)
                 
                 if test_mode:
                     print("Player: {} | State: {} | Volume: {}".format(player.name, player.playback_state, player.volume_level), flush=True)
@@ -301,7 +289,7 @@ def super_loop(output, test_mode=False, party_qr=False, display_timing=False):
                 time.sleep(max(0, 1 - (time.monotonic() - iteration_start)))
 
 
-def main(output, test_mode=False, party_qr=False, display_timing=False):
+def main(output, test_mode=False, party_qr=False):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     # get these here for error message
@@ -312,7 +300,7 @@ def main(output, test_mode=False, party_qr=False, display_timing=False):
     
     while True:
         try:
-            super_loop(output, test_mode=test_mode, party_qr=party_qr, display_timing=display_timing)
+            super_loop(output, test_mode=test_mode, party_qr=party_qr)
         except CONNECTION_ERRORS as error:
             error_message = str(error) or type(error).__name__
             print("{}: {}. Retrying in 10 seconds.".format(type(error).__name__, error_message),
@@ -326,7 +314,6 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test", action="store_true", help="save the UI to ui.png without using the display")
     parser.add_argument("--party-qr", action="store_true", help="show the Party guest join QR code")
-    parser.add_argument("--display-timing", action="store_true", help="print display and loop timings")
     return parser.parse_args(argv)
 
 
@@ -336,13 +323,13 @@ def create_output(args):
         return PreviewOutput("ui.png")
     from lib.waveshare_epd import epd2in9_V2
 
-    return DisplayOutput(epd2in9_V2, timing=args.display_timing)
+    return DisplayOutput(epd2in9_V2)
 
 
 if __name__ == "__main__":
     args = parse_args()
     try:
         with create_output(args) as output:
-            main(output, test_mode=args.test, party_qr=args.party_qr, display_timing=args.display_timing)
+            main(output, test_mode=args.test, party_qr=args.party_qr)
     except KeyboardInterrupt:
         pass

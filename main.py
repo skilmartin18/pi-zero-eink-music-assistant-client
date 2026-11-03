@@ -166,7 +166,7 @@ def download_cover(url, server_url, token, destination):
     destination.write_bytes(image)
 
 
-def super_loop(output, test_mode=False, party_qr=False):
+def super_loop(output, test_mode=False, party_qr=False, time_format="24"):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     server_url = os.environ.get("MA_URL")
@@ -273,7 +273,7 @@ def super_loop(output, test_mode=False, party_qr=False):
                     "next_title": next_item.name if next_item else None,
                     "artwork": artwork,
                     "party_url": party_url,
-                })
+                }, time_format=time_format)
                 
                  # output ui to image or display
                 output.update(image, song_key)
@@ -289,7 +289,7 @@ def super_loop(output, test_mode=False, party_qr=False):
                 time.sleep(max(0, 1 - (time.monotonic() - iteration_start)))
 
 
-def main(output, test_mode=False, party_qr=False):
+def main(output, test_mode=False, party_qr=False, time_format="24"):
     load_dotenv(Path(__file__).resolve().with_name(".env"), override=False)
     
     # get these here for error message
@@ -300,7 +300,7 @@ def main(output, test_mode=False, party_qr=False):
     
     while True:
         try:
-            super_loop(output, test_mode=test_mode, party_qr=party_qr)
+            super_loop(output, test_mode=test_mode, party_qr=party_qr, time_format=time_format)
         except CONNECTION_ERRORS as error:
             error_message = str(error) or type(error).__name__
             print("{}: {}. Retrying in 10 seconds.".format(type(error).__name__, error_message),
@@ -314,6 +314,8 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test", action="store_true", help="save the UI to ui.png without using the display")
     parser.add_argument("--party-qr", action="store_true", help="show the Party guest join QR code")
+    parser.add_argument("--time-format", choices=("12", "24"), default="24",
+                        help="clock format: 12-hour AM/PM or 24-hour (default: 24)")
     return parser.parse_args(argv)
 
 
@@ -330,6 +332,6 @@ if __name__ == "__main__":
     args = parse_args()
     try:
         with create_output(args) as output:
-            main(output, test_mode=args.test, party_qr=args.party_qr)
+            main(output, test_mode=args.test, party_qr=args.party_qr, time_format=args.time_format)
     except KeyboardInterrupt:
         pass

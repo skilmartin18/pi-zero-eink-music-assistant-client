@@ -1,16 +1,37 @@
 """Render Music Assistant now-playing data as a monochrome Pillow image."""
 
 import math
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 
 import qrcode
+from fontTools.ttLib import TTFont
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from qrcode.exceptions import DataOverflowError
 
 FONT_DIR = Path(__file__).resolve().parent / "fonts" / "static"
 DEFAULT_FONT = FONT_DIR / "PixelifySans-Regular.ttf"
 DEFAULT_BOLD_FONT = FONT_DIR / "PixelifySans-Bold.ttf"
+FALLBACK_FONT = Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc")
+FALLBACK_BOLD_FONT = Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc")
+
+
+@lru_cache(maxsize=32)
+def _font_characters(path, index):
+    with TTFont(path, fontNumber=index, lazy=True) as font:
+        return frozenset(font.getBestCmap() or {})
+
+
+def _font_for_text(text, font, bold=False):
+    characters = _font_characters(str(font.path), font.index)
+    if all(character.isspace() or ord(character) in characters for character in str(text)):
+        return font
+    fallback = FALLBACK_BOLD_FONT if bold else FALLBACK_FONT
+    try:
+        return ImageFont.truetype(str(fallback), font.size)
+    except OSError as error:
+        raise OSError("Noto CJK fallback font not found; install fonts-noto-cjk") from error
 
 
 def _fit_text(draw, text, font, max_width):
@@ -29,9 +50,16 @@ def _format_time(seconds):
     return "{}:{:02d}".format(minutes, seconds)
 
 
+def _format_clock(current_time, time_format):
+    if time_format == "12":
+        return "{}:{:02d} {}".format(current_time.hour % 12 or 12, current_time.minute,
+                                    "AM" if current_time.hour < 12 else "PM")
+    return "{:02d}:{:02d}".format(current_time.hour, current_time.minute)
+
+
 def _playback_label(state):
     state = getattr(state, "value", state)
-    return {"playing": "Playing", "paused": "Paused", "idle": "Paused"}.get(state, "Unknown")
+    return {"playing": "playing", "paused": "paused", "idle": "paused"}.get(state, "unknown")
 
 
 def _draw_wifi(draw, x, signal):
@@ -68,7 +96,7 @@ def render_connection_error(player_name, server_url, error_message, width=296, h
     draw = ImageDraw.Draw(image)
     message = "{}: {} ({}).".format(player_name, error_message, server_url)
     for size in range(16, 7, -1):
-        font = ImageFont.truetype(str(font_path), size)
+        font = _font_for_text(message, ImageFont.truetype(str(font_path), size))
         lines = []
         remaining = message
         while remaining:
@@ -102,7 +130,7 @@ def render_connection_error(player_name, server_url, error_message, width=296, h
     return image
 
 
-def render_now_playing(data, width=296, height=128, font_path=DEFAULT_FONT, bold_font_path=None):
+def render_now_playing(data, width=296, height=128, font_path=DEFAULT_FONT, bold_font_path=None, time_format="24"):
     """Return a landscape 1-bit image from a dictionary of player data."""
     if width < 240 or height < 128:
         raise ValueError("Now-playing layout requires at least 240 x 128 pixels")
@@ -118,9 +146,20 @@ def render_now_playing(data, width=296, height=128, font_path=DEFAULT_FONT, bold
     state = _playback_label(data.get("state"))
     volume = data.get("volume")
     volume_text = "Vol: {}%".format(volume) if volume is not None else "Vol: --"
-    draw.text((8, 1), _fit_text(draw, state, small_font, width - 176), font=small_font, fill=0)
-    draw.text((width - 160, 1), _fit_text(draw, data.get("player_name") or "Unknown player", small_font, 65), font=small_font, fill=0)
-    draw.text((width - 86, 1), _fit_text(draw, volume_text, small_font, 60), font=small_font, fill=0)
+    clock_text = _format_clock(datetime.now(), time_format)
+    clock_x = width - 32 - draw.textlength(clock_text, font=small_font)
+    volume_x = clock_x - 8 - draw.textlength(volume_text, font=small_font)
+    player_x = 8
+    state_width = draw.textlength(state, font=small_font)
+    player_name = data.get("player_name") or "Unknown player"
+    player_font = _font_for_text(player_name, small_font)
+    player_name = _fit_text(draw, player_name, player_font,
+                            volume_x - player_x - state_width - 13)
+    state_x = player_x + draw.textlength(player_name, font=player_font) + 5
+    draw.text((player_x, 1), player_name, font=player_font, fill=0)
+    draw.text((state_x, 1), state, font=small_font, fill=0)
+    draw.text((volume_x, 1), volume_text, font=small_font, fill=0)
+    draw.text((clock_x, 1), clock_text, font=small_font, fill=0)
     _draw_wifi(draw, width - 24, data.get("wifi_signal_dbm"))
     draw.line((8, 16, width - 9, 16), fill=0)
 
@@ -152,12 +191,13 @@ def render_now_playing(data, width=296, height=128, font_path=DEFAULT_FONT, bold
                 break
         draw.text(join_position, "join", font=join_font, fill=0, anchor="mb")
         reserved_regions = [(qr_x, qr_y, qr_x + qr_image.width, 97), join_bounds]
-    for y, value, font in (
-        (20, data.get("title") or "Unknown song", title_font),
-        (45, data.get("artist") or "Unknown artist", body_font),
-        (64, data.get("album") or "Unknown album", body_font),
-        (82, "Next: " + str(data.get("next_title") or "--"), small_font),
+    for y, value, font, bold in (
+        (20, data.get("title") or "Unknown song", title_font, True),
+        (45, data.get("artist") or "Unknown artist", body_font, False),
+        (64, data.get("album") or "Unknown album", body_font, False),
+        (82, "Next: " + str(data.get("next_title") or "--"), small_font, False),
     ):
+        font = _font_for_text(value, font, bold=bold)
         bounds = draw.textbbox((text_x, y), str(value), font=font)
         line_right = text_right
         for left, top, right, bottom in reserved_regions:

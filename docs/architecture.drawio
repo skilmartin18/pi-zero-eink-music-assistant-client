@@ -1,0 +1,117 @@
+<mxfile host="65bd71144e">
+    <diagram id="architecture" name="Player Architecture">
+        <mxGraphModel dx="1078" dy="861" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=26;fontStyle=1;fontColor=#172c32;" value="pi-music-player software architecture" vertex="1">
+                    <mxGeometry height="40" width="600" x="60" y="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="subtitle" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#536b70;" value="Display + Snapclient Layout" vertex="1">
+                    <mxGeometry height="25" width="600" x="60" y="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="sL1eiXPA7Tc-EF1P2rDv-5" edge="1" parent="1" source="server" style="edgeStyle=none;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="snapserver">
+                    <mxGeometry relative="1" x="0.1149" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="20" y="275"/>
+                            <mxPoint x="20" y="635"/>
+                        </Array>
+                        <mxPoint x="70" y="540" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="server" parent="1" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#dcefe9;strokeColor=#568c7e;fontColor=#173b34;fontSize=15;spacing=10;" value="&lt;b&gt;Music Assistant server&lt;/b&gt;&lt;br&gt;Player, queue, cover art&lt;br&gt;and optional Party URL" vertex="1">
+                    <mxGeometry height="110" width="210" x="60" y="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="pi" parent="1" style="swimlane;html=1;startSize=42;rounded=1;arcSize=3;fillColor=#f3f6f5;swimlaneFillColor=#ffffff;strokeColor=#9ab0ab;fontColor=#213b38;fontSize=18;fontStyle=1;align=left;spacingLeft=16;" value="Raspberry Pi" vertex="1">
+                    <mxGeometry height="740" width="880" x="340" y="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="app" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e8f2f1;strokeColor=#779f9b;fontColor=#173b34;fontSize=14;spacing=10;" value="&lt;b&gt;Player loop&lt;/b&gt;&lt;br&gt;main.py&lt;br&gt;&lt;font color=&quot;#536b70&quot;&gt;Polls selected player and queue; tracks progress and fetches artwork&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="120" width="220" x="60" y="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="client" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9ab0ab;fontColor=#173b34;fontSize=13;spacing=8;" value="&lt;b&gt;Synchronous client wrapper&lt;/b&gt;&lt;br&gt;music_assistant_client_synchronous.py&lt;br&gt;&lt;font color=&quot;#536b70&quot;&gt;Runs the async Music Assistant client&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="100" width="220" x="60" y="271" as="geometry"/>
+                </mxCell>
+                <mxCell id="renderer" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff4d8;strokeColor=#c6a45c;fontColor=#493c1d;fontSize=14;spacing=10;" value="&lt;b&gt;UI renderer&lt;/b&gt;&lt;br&gt;generate_ui.py&lt;br&gt;&lt;font color=&quot;#536b70&quot;&gt;Pillow image, text, artwork and optional QR code&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="120" width="205" x="360" y="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="output" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff4d8;strokeColor=#c6a45c;fontColor=#493c1d;fontSize=14;spacing=10;" value="&lt;b&gt;Output selection&lt;/b&gt;&lt;br&gt;render_ui.py&lt;br&gt;&lt;font color=&quot;#536b70&quot;&gt;PreviewOutput or DisplayOutput&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="120" width="190" x="640" y="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="driver" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9ab0ab;fontColor=#173b34;fontSize=14;spacing=8;" value="&lt;b&gt;Waveshare V2 driver&lt;/b&gt;&lt;br&gt;lib/waveshare_epd&lt;br&gt;&lt;font color=&quot;#536b70&quot;&gt;Full and partial refreshes&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="100" width="190" x="640" y="281" as="geometry"/>
+                </mxCell>
+                <mxCell id="snapclient" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7eef9;strokeColor=#809bbb;fontColor=#263c59;fontSize=14;spacing=10;" value="&lt;b&gt;Snapclient&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#536b70&quot;&gt;Separate audio playback process&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="90" width="205" x="360" y="470" as="geometry"/>
+                </mxCell>
+                <mxCell id="alsa" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7eef9;strokeColor=#809bbb;fontColor=#263c59;fontSize=14;spacing=10;" value="&lt;b&gt;ALSA / I2S&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#536b70&quot;&gt;Raspberry Pi audio output&lt;/font&gt;" vertex="1">
+                    <mxGeometry height="90" width="190" x="640" y="470" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-app-client" edge="1" parent="pi" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#568c7e;fontColor=#355b52;fontSize=12;startArrow=classicThin;startFill=1;" target="client" value="">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="170" y="221" as="sourcePoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edge-app-render" edge="1" parent="pi" source="app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#a88b4d;fontColor=#725e30;fontSize=12;" target="renderer" value="player data&lt;div&gt;cover art&lt;/div&gt;">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-render-output" edge="1" parent="pi" source="renderer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#a88b4d;fontColor=#725e30;fontSize=12;" target="output" value="1-bit image">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-output-driver" edge="1" parent="pi" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#568c7e;fontColor=#355b52;fontSize=12;" target="driver" value="display mode">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="735" y="221" as="sourcePoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edge-snapclient-alsa" edge="1" parent="pi" source="snapclient" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#809bbb;fontColor=#405c7c;fontSize=12;" target="alsa" value="">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="preview" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#fff4d8;strokeColor=#c6a45c;fontColor=#493c1d;fontSize=14;spacing=8;" value="&lt;b&gt;PNG preview&lt;/b&gt;&lt;br&gt;ui.png (--test)" vertex="1">
+                    <mxGeometry height="80" width="190" x="390" y="300" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-output-preview" edge="1" parent="pi" source="output" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#a88b4d;fontColor=#725e30;fontSize=12;exitX=0;exitY=0.75;exitDx=0;exitDy=0;" target="preview" value="test mode">
+                    <mxGeometry relative="1" x="-0.1429" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="600" y="190"/>
+                            <mxPoint x="600" y="340"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="snapserver" parent="1" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7eef9;strokeColor=#809bbb;fontColor=#263c59;fontSize=15;spacing=10;" value="&lt;b&gt;Snapcast server&lt;/b&gt;&lt;br&gt;Audio stream" vertex="1">
+                    <mxGeometry height="90" width="210" x="60" y="590" as="geometry"/>
+                </mxCell>
+                <mxCell id="display" parent="1" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#dcefe9;strokeColor=#568c7e;fontColor=#173b34;fontSize=14;spacing=8;" value="&lt;b&gt;2.9-inch e-paper&lt;/b&gt;&lt;br&gt;296 x 128 monochrome" vertex="1">
+                    <mxGeometry height="90" width="190" x="1300" y="405" as="geometry"/>
+                </mxCell>
+                <mxCell id="dac" parent="1" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7eef9;strokeColor=#809bbb;fontColor=#263c59;fontSize=14;spacing=8;" value="&lt;b&gt;PCM5102A DAC&lt;/b&gt;&lt;br&gt;Analog line output to Hi-Fi" vertex="1">
+                    <mxGeometry height="90" width="190" x="1300" y="590" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-server-client" edge="1" parent="1" source="client" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#568c7e;fontColor=#355b52;fontSize=12;exitX=0;exitY=0.25;entryX=0.65;entryY=1;" value="request player data">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="196.5" y="331" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edge-client-response" edge="1" parent="1" source="server" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#568c7e;fontColor=#355b52;fontSize=12;exitX=0.35;exitY=1;entryX=0;entryY=0.75;" target="client" value="return player data">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-server-app" edge="1" parent="1" source="app" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#568c7e;fontColor=#355b52;fontSize=12;exitX=0;exitY=0.25;entryX=1;entryY=0.25;" target="server" value="request cover art">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-artwork-response" edge="1" parent="1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#568c7e;fontColor=#355b52;fontSize=12;exitX=1;exitY=0.75;entryX=0;entryY=0.75;" value="return cover art&amp;nbsp;">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="270" y="303.5" as="sourcePoint"/>
+                        <mxPoint x="400" y="311" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="edge-driver-display" edge="1" parent="1" source="driver" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#568c7e;fontColor=#355b52;fontSize=12;" target="display" value="SPI">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-snapserver-client" edge="1" parent="1" source="snapserver" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#809bbb;fontColor=#405c7c;fontSize=12;" target="snapclient" value="audio stream :1704">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-alsa-dac" edge="1" parent="1" source="alsa" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#809bbb;fontColor=#405c7c;fontSize=12;" target="dac" value="I2S">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

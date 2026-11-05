@@ -1,6 +1,6 @@
 <mxfile host="65bd71144e">
     <diagram id="architecture" name="Player Architecture">
-        <mxGraphModel dx="1078" dy="861" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+        <mxGraphModel dx="1581" dy="875" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
@@ -40,7 +40,7 @@
                 <mxCell id="driver" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9ab0ab;fontColor=#173b34;fontSize=14;spacing=8;" value="&lt;b&gt;Waveshare V2 driver&lt;/b&gt;&lt;br&gt;lib/waveshare_epd&lt;br&gt;&lt;font color=&quot;#536b70&quot;&gt;Full and partial refreshes&lt;/font&gt;" vertex="1">
                     <mxGeometry height="100" width="190" x="640" y="281" as="geometry"/>
                 </mxCell>
-                <mxCell id="snapclient" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7eef9;strokeColor=#809bbb;fontColor=#263c59;fontSize=14;spacing=10;" value="&lt;b&gt;Snapclient&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#536b70&quot;&gt;Separate audio playback process&lt;/font&gt;" vertex="1">
+                <mxCell id="snapclient" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7eef9;strokeColor=#809bbb;fontColor=#263c59;fontSize=14;spacing=10;" value="&lt;b&gt;Snapclient/Sendspin-cli&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#536b70&quot;&gt;Separate audio playback process&lt;/font&gt;" vertex="1">
                     <mxGeometry height="90" width="205" x="360" y="470" as="geometry"/>
                 </mxCell>
                 <mxCell id="alsa" parent="pi" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7eef9;strokeColor=#809bbb;fontColor=#263c59;fontSize=14;spacing=10;" value="&lt;b&gt;ALSA / I2S&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#536b70&quot;&gt;Raspberry Pi audio output&lt;/font&gt;" vertex="1">
@@ -76,7 +76,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="snapserver" parent="1" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7eef9;strokeColor=#809bbb;fontColor=#263c59;fontSize=15;spacing=10;" value="&lt;b&gt;Snapcast server&lt;/b&gt;&lt;br&gt;Audio stream" vertex="1">
+                <mxCell id="snapserver" parent="1" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#e7eef9;strokeColor=#809bbb;fontColor=#263c59;fontSize=15;spacing=10;" value="&lt;b&gt;Snapcast/Sendspin server&lt;/b&gt;&lt;br&gt;Audio stream" vertex="1">
                     <mxGeometry height="90" width="210" x="60" y="590" as="geometry"/>
                 </mxCell>
                 <mxCell id="display" parent="1" style="rounded=1;arcSize=8;whiteSpace=wrap;html=1;fillColor=#dcefe9;strokeColor=#568c7e;fontColor=#173b34;fontSize=14;spacing=8;" value="&lt;b&gt;2.9-inch e-paper&lt;/b&gt;&lt;br&gt;296 x 128 monochrome" vertex="1">

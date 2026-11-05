@@ -28,14 +28,19 @@ def main():
     player = input(f"Music Assistant player name [{hostname}]: ").strip() or hostname
     wifi = input("Wi-Fi interface [wlan0]: ").strip() or "wlan0"
 
-    snapclient = input("Install Snapclient? [Y/n]: ").strip().lower() not in ("n", "no")
+    while True:
+        audio_client = input("Audio client: snapcast, sendspin, or none [snapcast]: ").strip().lower() or "snapcast"
+        if audio_client in ("snapcast", "sendspin", "none"):
+            break
+        print("Choose snapcast, sendspin, or none.")
+    snapclient = audio_client == "snapcast"
     if snapclient:
         default_server = urlsplit(url).hostname or ""
         snap_server = input(f"Snapserver hostname or IP [{default_server}]: ").strip() or default_server
         snap_port = input("Snapserver stream port [1704]: ").strip() or "1704"
 
     print("\nThis will configure the DAC, SPI, hostname, application, and startup service.")
-    if input("Continue? [Y/n]: ").strip().lower() not in ("n", "no"):
+    if input("Continue? [Y/n]: ").strip().lower() in ("n", "no"):
         print("Cancelled.")
         return
 
@@ -43,6 +48,11 @@ def main():
     run("apt", "install", "-y", "python3-venv", "python3-dev", "build-essential", "libjpeg-dev", "zlib1g-dev", "fonts-noto-cjk")
     if snapclient:
         run("apt", "install", "-y", "snapclient")
+    elif audio_client == "sendspin":
+        run("bash", "-c", "curl -fsSL https://raw.githubusercontent.com/Sendspin/sendspin-cpp-cli/main/scripts/get_started_linux.sh | bash")
+        if input("Set a custom Sendspin server? [y/N]: ").strip().lower() in ("y", "yes"):
+            print("Custom Sendspin server configuration is not available yet.")
+            run("systemctl", "restart", "sendspin-cli.service")
 
     venv = PROJECT_DIR / ".venv"
     run("sudo", "-u", service_user, "python3", "-m", "venv", "--system-site-packages", str(venv))
@@ -95,6 +105,11 @@ WantedBy=multi-user.target
     run("systemctl", "daemon-reload")
     run("systemctl", "enable", "pi-eink-music-player.service")
     print("\nDone. Reboot to apply the hostname, DAC, and SPI settings.")
+    if audio_client == "sendspin":
+        print("\nBegin pairing on your Sendspin server. Monitor the player logs with:")
+        print("  sudo journalctl -u sendspin-cli -f")
+        print("Look for: I cli: *** Pairing code: 714536 *** -- type it into the server to pair.")
+        print("The code shown above is an example; use the code from your logs.")
 
 
 if __name__ == "__main__":

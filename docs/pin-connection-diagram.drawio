@@ -1,10 +1,10 @@
 <mxfile host="65bd71144e">
     <diagram id="wiring" name="Pi Wiring">
-        <mxGraphModel dx="891" dy="711" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1200" math="0" shadow="0">
+        <mxGraphModel dx="1925" dy="1093" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1200" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
-                <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=26;fontStyle=1;fontColor=#173b34;" value="Raspberry Pi hardware wiring" vertex="1">
+                <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=26;fontStyle=1;fontColor=#173b34;" value="pin connection diagram" vertex="1">
                     <mxGeometry height="40" width="800" x="60" y="30" as="geometry"/>
                 </mxCell>
                 <mxCell id="subtitle" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=14;fontColor=#536b70;" value="40-pin header viewed from the pin side: pin 1 top left, odd pins left, even pins right  |  GPIO numbers are BCM" vertex="1">
@@ -72,12 +72,6 @@
                 </mxCell>
                 <mxCell id="j2-l" parent="1" style="rounded=1;arcSize=10;html=1;fillColor=#ffffff;strokeColor=#809bbb;fontSize=14;" value="L" vertex="1">
                     <mxGeometry height="30" width="32" x="1788" y="695" as="geometry"/>
-                </mxCell>
-                <mxCell id="display-heading" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=12;fontStyle=1;fontColor=#527067;" value="ODD PINS" vertex="1">
-                    <mxGeometry height="25" width="180" x="510" y="185" as="geometry"/>
-                </mxCell>
-                <mxCell id="dac-heading" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=12;fontStyle=1;fontColor=#527067;" value="EVEN PINS" vertex="1">
-                    <mxGeometry height="25" width="180" x="710" y="185" as="geometry"/>
                 </mxCell>
                 <mxCell id="d-vcc" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#c6a45c;fontSize=14;" value="VCC" vertex="1">
                     <mxGeometry height="30" width="160" x="80" y="527.5" as="geometry"/>

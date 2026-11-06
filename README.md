@@ -25,7 +25,15 @@ For a fresh DietPi setup, run the interactive installer from the project directo
 sudo python3 install.py
 ```
 
-The installer configures the Pi, creates the application service, and offers Snapclient, Sendspin, or no audio client. Sendspin uses its upstream installation script; custom server configuration is not yet implemented. To pair, follow the installer instructions and check the Sendspin service log for the pairing code. It creates the .env and modifies system configuration. Reboot after installation.
+The installer configures the Pi, creates the application service, and offers Snapclient, Sendspin, or no audio client. It creates the .env and modifies system configuration. Reboot after installation.
+
+If you chose Sendspin, run its upstream installer after reboot, once the DAC is available:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Sendspin/sendspin-cpp-cli/main/scripts/get_started_linux.sh | bash
+```
+
+Follow the upstream installer to configure Sendspin, then begin pairing on your server and check `sudo journalctl -u sendspin-cli -f` for the pairing code.
 
 For a manual installation on Debian-based systems (not including snapclient or spi setup):
 

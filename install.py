@@ -48,11 +48,6 @@ def main():
     run("apt", "install", "-y", "python3-venv", "python3-dev", "build-essential", "libjpeg-dev", "zlib1g-dev", "fonts-noto-cjk")
     if snapclient:
         run("apt", "install", "-y", "snapclient")
-    elif audio_client == "sendspin":
-        run("bash", "-c", "curl -fsSL https://raw.githubusercontent.com/Sendspin/sendspin-cpp-cli/main/scripts/get_started_linux.sh | bash")
-        if input("Set a custom Sendspin server? [y/N]: ").strip().lower() in ("y", "yes"):
-            print("Custom Sendspin server configuration is not available yet.")
-            run("systemctl", "restart", "sendspin-cli.service")
 
     venv = PROJECT_DIR / ".venv"
     run("sudo", "-u", service_user, "python3", "-m", "venv", "--system-site-packages", str(venv))
@@ -106,7 +101,9 @@ WantedBy=multi-user.target
     run("systemctl", "enable", "pi-eink-music-player.service")
     print("\nDone. Reboot to apply the hostname, DAC, and SPI settings.")
     if audio_client == "sendspin":
-        print("\nBegin pairing on your Sendspin server. Monitor the player logs with:")
+        print("\nAfter reboot, install Sendspin once the DAC is available:")
+        print("  curl -fsSL https://raw.githubusercontent.com/Sendspin/sendspin-cpp-cli/main/scripts/get_started_linux.sh | bash")
+        print("\nAfter installation, begin pairing on your Sendspin server. Monitor the player logs with:")
         print("  sudo journalctl -u sendspin-cli -f")
         print("Look for: I cli: *** Pairing code: 714536 *** -- type it into the server to pair.")
         print("The code shown above is an example; use the code from your logs.")

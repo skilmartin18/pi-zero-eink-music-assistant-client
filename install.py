@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Set up the music player on a fresh DietPi installation."""
 
-import getpass
 import os
 from pathlib import Path
 import pwd
@@ -24,7 +23,7 @@ def main():
     old_hostname = Path("/etc/hostname").read_text().strip()
     hostname = input(f"Hostname [{old_hostname}]: ").strip() or old_hostname
     url = input("Music Assistant URL e.g. (http://192.168.1.1:8095): ").strip()
-    token = getpass.getpass("Music Assistant token: ")
+    token = input("Music Assistant token: ")
     player = input(f"Music Assistant player name [{hostname}]: ").strip() or hostname
     wifi = input("Wi-Fi interface [wlan0]: ").strip() or "wlan0"
 
@@ -45,9 +44,12 @@ def main():
         return
 
     run("apt", "update")
-    run("apt", "install", "-y", "python3-venv", "python3-dev", "build-essential", "libjpeg-dev", "zlib1g-dev", "fonts-noto-cjk")
+    run("apt", "install", "-y", "python3-venv", "python3-dev", "python3-lgpio", "build-essential", "libjpeg-dev", "libtiff6", "libopenjp2-7", "libfreetype6", "zlib1g-dev", "fonts-noto-cjk")
     if snapclient:
         run("apt", "install", "-y", "snapclient")
+    elif audio_client == "sendspin":
+        run("apt", "install", "-y", "avahi-daemon")
+        run("systemctl", "enable", "--now", "avahi-daemon.service")
 
     venv = PROJECT_DIR / ".venv"
     run("sudo", "-u", service_user, "python3", "-m", "venv", "--system-site-packages", str(venv))
@@ -59,6 +61,8 @@ def main():
         for key, value in (("MA_URL", url), ("MA_TOKEN", token), ("MA_PLAYER", player), ("WIFI_INTERFACE", wifi)):
             value = value.replace("\\", "\\\\").replace("'", "\\'")
             env_file.write(f"{key}='{value}'\n")
+    user_info = pwd.getpwnam(service_user)
+    os.chown(env_path, user_info.pw_uid, user_info.pw_gid)
             
 
     shutil.copy2(BOOT_CONFIG, str(BOOT_CONFIG) + ".bak")
@@ -88,8 +92,9 @@ After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory="{directory}"
-ExecStart="{executable_dir}/.venv/bin/python" -u "{executable_dir}/main.py"
+User={service_user}
+WorkingDirectory={directory}
+ExecStart={executable_dir}/.venv/bin/python -u {executable_dir}/main.py
 Restart=on-failure
 RestartSec=5s
 

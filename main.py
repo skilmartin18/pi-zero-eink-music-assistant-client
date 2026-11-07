@@ -5,6 +5,7 @@ import math
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from urllib.parse import urljoin, urlsplit
@@ -187,6 +188,8 @@ def super_loop(output, test_mode=False, party_qr=False, time_format="24"):
     
     previous_art = None
     previous_track = None
+    previous_state = None
+    previous_minute = None
     received_data = False
     elapsed_tracker = QueueElapsedTracker()
     
@@ -259,24 +262,26 @@ def super_loop(output, test_mode=False, party_qr=False, time_format="24"):
                     except (InvalidCommand, ProviderUnavailableError, InsufficientPermissions) as error:
                         party_error = str(error)
                     
-                # create the image of the ui
-                image = render_now_playing({
-                    "player_name": player.name,
-                    "wifi_signal_dbm": wifi_signal_dbm(os.environ.get("WIFI_INTERFACE") or "wlan0"),
-                    "title": title,
-                    "artist": artist,
-                    "album": album,
-                    "state": player.playback_state,
-                    "volume": player.volume_level,
-                    "elapsed": elapsed,
-                    "duration": duration,
-                    "next_title": next_item.name if next_item else None,
-                    "artwork": artwork,
-                    "party_url": party_url,
-                }, time_format=time_format)
-                
-                 # output ui to image or display
-                output.update(image, song_key)
+                state = getattr(player.playback_state, "value", player.playback_state)
+                current_minute = datetime.now().replace(second=0, microsecond=0)
+                if state == "playing" or state != previous_state or current_minute != previous_minute:
+                    image = render_now_playing({
+                        "player_name": player.name,
+                        "wifi_signal_dbm": wifi_signal_dbm(os.environ.get("WIFI_INTERFACE") or "wlan0"),
+                        "title": title,
+                        "artist": artist,
+                        "album": album,
+                        "state": player.playback_state,
+                        "volume": player.volume_level,
+                        "elapsed": elapsed,
+                        "duration": duration,
+                        "next_title": next_item.name if next_item else None,
+                        "artwork": artwork,
+                        "party_url": party_url,
+                    }, time_format=time_format)
+                    output.update(image, song_key)
+                    previous_state = state
+                    previous_minute = current_minute
                 
                 if test_mode:
                     print("Player: {} | State: {} | Volume: {}".format(player.name, player.playback_state, player.volume_level), flush=True)
@@ -286,7 +291,7 @@ def super_loop(output, test_mode=False, party_qr=False, time_format="24"):
                         print("Party URL: {}".format(party_url or ("unavailable ({})".format(party_error) if party_error else "unavailable")), flush=True)
                     print("Time: {} / {} | Cover: {}\n".format(format_time(elapsed), format_time(duration), artwork or "unavailable"), flush=True)
                 
-                time.sleep(max(0, 1 - (time.monotonic() - iteration_start)))
+                time.sleep(max(0, 3 - (time.monotonic() - iteration_start)))
 
 
 def main(output, test_mode=False, party_qr=False, time_format="24"):

@@ -94,7 +94,7 @@ After=network-online.target
 Type=simple
 User={service_user}
 WorkingDirectory={directory}
-ExecStart={executable_dir}/.venv/bin/python -u {executable_dir}/main.py
+ExecStart={executable_dir}/.venv/bin/python -u {executable_dir}/main.py --party-qr
 Restart=on-failure
 RestartSec=5s
 

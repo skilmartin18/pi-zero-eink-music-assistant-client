@@ -6,6 +6,10 @@ A Raspberry Pi powered display for Music Assistant. Designed for the Pi Zero W, 
 	<img src="docs/ui_example.png" alt="Example now-playing screen" width="592">
 </p>
 
+<p align="center">
+	<img src="docs/inCaseResize.jpg" alt="Device in a 3D printed Case" width="592">
+</p>
+
 ## Requirements
 
 - Raspberry Pi
@@ -81,9 +85,9 @@ There is a 3d model for the low effort case i designed for this. This was a step
 
 It could also be way lower profile but decided to make it large enough to fit ribbon cables and pin headers because i didnt want to permanently solder this setup. 
 
-<img src="docs/body.png" alt="Case body" width="400">
-<img src="docs/frontPanel.png" alt="Case front panel" width="400">
-<img src="docs/backPlate.png" alt="Case back plate" width="400">
+<img src="docs/v2-body.png" alt="Case body" width="400">
+<img src="docs/v2-frontpanel.png" alt="Case front panel" width="400">
+<img src="docs/v2-backPlate.png" alt="Case back plate" width="400">
 
 ## Extra Documentation
 

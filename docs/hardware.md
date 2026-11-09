@@ -2,6 +2,11 @@
 
 What hardware needs to be bought, and how it needs to be setup for this project. 
 
+Here's what this inside of mine looks like (absolutely terrible):
+
+![Hardware Internals](thisLooksTerribleResize.jpg)
+
+
 ## Bill of Materials
 
 - [Raspberry Pi Zero W](https://core-electronics.com.au/raspberry-pi-zero-w-wireless.html): $28.50

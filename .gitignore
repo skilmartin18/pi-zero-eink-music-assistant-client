@@ -3,4 +3,5 @@
 *.jpg
 *.png
 !docs/*.png
+!docs/*.jpg
 __pycache__

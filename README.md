@@ -17,6 +17,8 @@ A Raspberry Pi powered display for Music Assistant. Designed for the Pi Zero W, 
 - SSD1680 296*128 Eink
 - An existing Music Assistant Server to setup this device as a player for (either sendspin or snapcast).
 
+**NOTE: It seems like music-assistant (or at least my install) no longer supports multiroom audio sync groups with snapccast players, for multiroom setups use sendspin**
+
 Check that you've hooked everything up as expected before proceeding. See the [hardware guide](docs/PCM5102A-Hardware-Guide.md) for more info.
 
 ## Installation

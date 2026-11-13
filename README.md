@@ -19,7 +19,7 @@ A Raspberry Pi powered display for Music Assistant. Designed for the Pi Zero W, 
 
 **NOTE: It seems like music-assistant (or at least my install) no longer supports multiroom audio sync groups with snapccast players, for multiroom setups use sendspin**
 
-**NOTE: if youre using sendspin and experience the occasional stutter, increase the sendspin buffering time in /etc/etc/sendspin-cli.conf**
+**NOTE: if youre using sendspin and experience the occasional stutter, increase or decrease the sendspin buffering time in /etc/etc/sendspin-cli.conf, or change the codec from flac to opus**
 
 Check that you've hooked everything up as expected before proceeding. See the [hardware guide](docs/PCM5102A-Hardware-Guide.md) for more info.
 
